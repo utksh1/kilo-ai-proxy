@@ -18,6 +18,14 @@ API_KEY = os.getenv("PROXY_API_KEY", "abc")
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "inclusionai/ring-2.6-1t:free")
 PORT = int(os.getenv("PORT", 3005))
 
+# Failover Queue (Ordered by Smartness)
+FAILOVER_MODELS = [
+    "inclusionai/ring-2.6-1t:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "openrouter/free",
+    "stepfun/step-3.5-flash:free"
+]
+
 security = HTTPBearer()
 
 app = FastAPI(
@@ -86,42 +94,55 @@ async def chat_completions(
         "Accept": "application/json"
     }
 
-    # 3. Ensure we use a free model if not specified
-    if "model" not in body or not body["model"]:
-        body["model"] = "kilo-auto/free"
+    # 3. Ensure we use a model
+    primary_model = body.get("model") or DEFAULT_MODEL
     
-    logger.info(f"Forwarding request to Kilo (Model: {body['model']}, MachineID: {machine_id})")
-
-    # 4. Proxy the request to Kilo Gateway
+    # 4. Failover Retry Loop
+    # We will try the primary model first, then fall back to others if needed
+    models_to_try = [primary_model] + [m for m in FAILOVER_MODELS if m != primary_model]
+    
     is_streaming = body.get("stream", False)
 
-    async def stream_generator():
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", KILO_GATEWAY_URL, json=body, headers=headers) as response:
-                if response.status_code != 200:
-                    error_detail = await response.aread()
-                    logger.error(f"Kilo API Error: {response.status_code} - {error_detail.decode()}")
-                    yield f"data: {json.dumps({'error': 'Kilo API error', 'status': response.status_code})}\n\n"
-                    return
+    for attempt, model in enumerate(models_to_try[:3]):  # Try up to 3 models
+        machine_id = str(uuid.uuid4())
+        current_headers = {**headers, "X-KILOCODE-MACHINEID": machine_id}
+        body["model"] = model
+        
+        logger.info(f"Attempt {attempt + 1}: Using {model} (MachineID: {machine_id})")
 
-                async for line in response.aiter_lines():
-                    if line:
-                        yield f"{line}\n"
+        try:
+            if is_streaming:
+                # For streaming, we check the initial response status
+                client = httpx.AsyncClient(timeout=60.0)
+                # We use a manual stream handle to check status code first
+                response = await client.post(KILO_GATEWAY_URL, json=body, headers=current_headers)
+                
+                if response.status_code == 200:
+                    async def stream_generator(resp, cl):
+                        async for line in resp.aiter_lines():
+                            if line:
+                                yield f"{line}\n"
+                        await cl.aclose()
 
-    if is_streaming:
-        return StreamingResponse(stream_generator(), media_type="text/event-stream")
-    else:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            try:
-                response = await client.post(KILO_GATEWAY_URL, json=body, headers=headers)
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Kilo API Error: {e.response.status_code} - {e.response.text}")
-                return JSONResponse(status_code=e.response.status_code, content=e.response.json())
-            except Exception as e:
-                logger.error(f"Proxy Error: {str(e)}")
-                raise HTTPException(status_code=500, detail=str(e))
+                    return StreamingResponse(stream_generator(response, client), media_type="text/event-stream")
+                else:
+                    await client.aclose()
+                    logger.warning(f"Model {model} failed with {response.status_code}. Trying failover...")
+                    continue # Try next model
+            else:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(KILO_GATEWAY_URL, json=body, headers=current_headers)
+                    if response.status_code == 200:
+                        return response.json()
+                    else:
+                        logger.warning(f"Model {model} failed with {response.status_code}. Trying failover...")
+                        continue # Try next model
+
+        except Exception as e:
+            logger.error(f"Attempt {attempt + 1} failed for {model}: {str(e)}")
+            continue
+
+    raise HTTPException(status_code=503, detail="All smart models are currently overloaded. Please try again later.")
 
 @app.get("/health", tags=["System"])
 async def health_check():
