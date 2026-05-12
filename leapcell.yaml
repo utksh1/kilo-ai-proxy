@@ -1,0 +1,10 @@
+version: 1
+services:
+  kilo-proxy:
+    runtime: python
+    entry: main:app
+    command: uvicorn main:app --host 0.0.0.0 --port $PORT
+    env:
+      PROXY_API_KEY: abc
+      DEFAULT_MODEL: inclusionai/ring-2.6-1t:free
+    install: pip install -r requirements.txt
