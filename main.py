@@ -5,6 +5,7 @@ import httpx
 import uuid
 import json
 import logging
+import os
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 
@@ -12,7 +13,11 @@ from typing import List, Optional, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("KiloProxy")
 
-API_KEY = "abc"
+# Environment Variables for Cloud Hosting
+API_KEY = os.getenv("PROXY_API_KEY", "abc")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "inclusionai/ring-2.6-1t:free")
+PORT = int(os.getenv("PORT", 3005))
+
 security = HTTPBearer()
 
 app = FastAPI(
@@ -51,7 +56,7 @@ class ChatMessage(BaseModel):
     content: str = Field(..., example="Hello!")
 
 class ChatRequest(BaseModel):
-    model: Optional[str] = Field("inclusionai/ring-2.6-1t:free", example="inclusionai/ring-2.6-1t:free")
+    model: Optional[str] = Field(DEFAULT_MODEL, example=DEFAULT_MODEL)
     messages: List[ChatMessage]
     stream: Optional[bool] = Field(False, example=False)
     temperature: Optional[float] = Field(0.7, example=0.7)
@@ -132,4 +137,4 @@ async def list_models():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=3005)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
