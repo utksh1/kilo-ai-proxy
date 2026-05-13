@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, Security
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse, JSONResponse
 import httpx
@@ -17,6 +18,11 @@ logger = logging.getLogger("KiloProxy")
 API_KEY = os.getenv("PROXY_API_KEY", "abc")
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "inclusionai/ring-2.6-1t:free")
 PORT = int(os.getenv("PORT", 3005))
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")
+    if origin.strip()
+]
 
 # Failover Queue (Ordered by Smartness)
 FAILOVER_MODELS = [
@@ -36,6 +42,15 @@ app = FastAPI(
         "name": "Kilo Proxy Support",
         "url": "https://github.com/Kilo-Org/kilocode",
     }
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Generation-Id", "cf-ray"],
 )
 
 KILO_GATEWAY_URL = "https://api.kilo.ai/api/gateway/chat/completions"
