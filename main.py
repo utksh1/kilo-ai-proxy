@@ -60,18 +60,13 @@ DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 
 # Full list of free models discovered in Kilo binary (Ordered by IQ & Parameters)
 FREE_MODELS = [
-    {"id": "inclusionai/ring-2.6-1t:free", "name": "🌌 Default: Ring 2.6 1T (Largest Model)", "owned_by": "inclusionai"},
-    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "name": "🐘 Heavyweight: Nemotron 3 Super 120B", "owned_by": "nvidia"},
+    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "name": "🐘 Default: Nemotron 3 Super 120B (Best Support & IQ)", "owned_by": "nvidia"},
     {"id": "openrouter/free", "name": "🏆 Smartest: OpenRouter Free (Best IQ)", "owned_by": "openrouter"},
     {"id": "stepfun/step-3.5-flash:free", "name": "⚡ Fastest Smart: Step 3.5 Flash", "owned_by": "stepfun"},
     {"id": "poolside/laguna-xs.2:free", "name": "🧠 Deep Logic: Laguna XS.2", "owned_by": "poolside"},
-    {"id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "name": "🦉 Reasoning: Nemotron 3 Owl Alpha", "owned_by": "nvidia"},
     {"id": "kilo-auto/free", "name": "Kilo Auto (Dynamic Router)", "owned_by": "kilo"},
-    {"id": "x-ai/grok-code-fast-1:optimized:free", "name": "Grok Code Fast 1 (Free)", "owned_by": "xai"},
     {"id": "poolside/laguna-m.1:free", "name": "Laguna M.1 (Free)", "owned_by": "poolside"},
-    {"id": "baidu/cobuddy:free", "name": "Baidu Cobuddy (Free)", "owned_by": "baidu"},
-    {"id": "mimo-v2-flash", "name": "Xiaomi MiMo V2 Flash", "owned_by": "xiaomi"},
-    {"id": "nova-2-lite-v1", "name": "Amazon Nova 2 Lite", "owned_by": "amazon"}
+    {"id": "baidu/cobuddy:free", "name": "Baidu Cobuddy (Free)", "owned_by": "baidu"}
 ]
 
 # Models for Swagger documentation and validation
