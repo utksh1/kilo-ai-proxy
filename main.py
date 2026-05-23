@@ -7,7 +7,7 @@ import uuid
 import json
 import logging
 import os
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Any
 
 # Configure logging
@@ -16,7 +16,7 @@ logger = logging.getLogger("KiloProxy")
 
 # Environment Variables for Cloud Hosting
 API_KEY = os.getenv("PROXY_API_KEY", "abc")
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "inclusionai/ring-2.6-1t:free")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
 PORT = int(os.getenv("PORT", 3005))
 ALLOWED_ORIGINS = [
     origin.strip()
@@ -26,10 +26,11 @@ ALLOWED_ORIGINS = [
 
 # Failover Queue (Ordered by Smartness)
 FAILOVER_MODELS = [
-    "inclusionai/ring-2.6-1t:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
     "openrouter/free",
-    "stepfun/step-3.5-flash:free"
+    "stepfun/step-3.5-flash:free",
+    "poolside/laguna-xs.2:free",
+    "kilo-auto/free"
 ]
 
 security = HTTPBearer()
@@ -55,7 +56,7 @@ app.add_middleware(
 
 KILO_GATEWAY_URL = "https://api.kilo.ai/api/gateway/chat/completions"
 DEFAULT_USER_AGENT = "Kilo CLI"
-DEFAULT_MODEL = "inclusionai/ring-2.6-1t:free"
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 
 # Full list of free models discovered in Kilo binary (Ordered by IQ & Parameters)
 FREE_MODELS = [
@@ -75,10 +76,12 @@ FREE_MODELS = [
 
 # Models for Swagger documentation and validation
 class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="allow")
     role: str = Field(..., example="user")
-    content: str = Field(..., example="Hello!")
+    content: Optional[str] = Field(None, example="Hello!")
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
     model: Optional[str] = Field(DEFAULT_MODEL, example=DEFAULT_MODEL)
     messages: List[ChatMessage]
     stream: Optional[bool] = Field(False, example=False)
@@ -96,7 +99,7 @@ async def chat_completions(
         raise HTTPException(status_code=401, detail="Invalid API Key. Use 'abc'")
 
     # 1. Prepare the body for Kilo
-    body = request_data.dict(exclude_none=True)
+    body = request_data.model_dump(exclude_none=True)
 
     # 2. Prepare headers
     # Priority: 1. Header from client, 2. Random UUID
